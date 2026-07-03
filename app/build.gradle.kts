@@ -80,6 +80,8 @@ dependencies {
     // CameraX (Нужно для PreviewView в UI)
     implementation(libs.camera.view)
     implementation(libs.camera.lifecycle)
+    implementation(libs.camera.camera2)
+    implementation(libs.camera.core)
 
     // Dagger Hilt (Главный контейнер DI для всего приложения)
     implementation(libs.hilt.android)
