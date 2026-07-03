@@ -7,10 +7,10 @@ plugins {
 
 android {
     namespace = "com.example.core_data"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
-        minSdk = 26
+        minSdk = 28 // Updated for Android 9+ support
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles("consumer-rules.pro")
     }
@@ -54,6 +54,7 @@ dependencies {
     // DataStore & Crypto
     implementation(libs.datastore.pref)
     implementation(libs.androidx.security.crypto)
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 
     // Тестирование
     testImplementation(libs.junit)

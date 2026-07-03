@@ -3,16 +3,16 @@ import com.android.build.api.dsl.AaptOptions
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.jetbrains.kotlin.android)
-    alias(libs.plugins.google.ksp) // Раз в core-data заработало, оставляем через alias
+    alias(libs.plugins.google.ksp)
     alias(libs.plugins.hilt.android)
 }
 
 android {
     namespace = "com.example.feature_cv"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
-        minSdk = 26
+        minSdk = 28 // Updated for Android 9+ support
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles("consumer-rules.pro")
     }
@@ -71,5 +71,4 @@ dependencies {
     androidTestImplementation(libs.androidx.espresso.core)
 
     implementation(project(":domain"))
-
 }

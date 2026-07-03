@@ -7,10 +7,10 @@ plugins {
 
 android {
     namespace = "com.example.feature_tts"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
-        minSdk = 26
+        minSdk = 28 // Updated for Android 9+ support
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles("consumer-rules.pro")
     }
