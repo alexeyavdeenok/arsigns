@@ -1,12 +1,11 @@
-package com.example.core_data
+package com.example.core_data.room
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
-import com.example.domain.model.SignEntity
 
 @Entity(tableName = "signs")
-data class SignRow(
+data class SignEntityDb(
     @PrimaryKey
     @ColumnInfo(name = "Original_Category_ID")
     val originalCategoryId: String,
@@ -25,13 +24,4 @@ data class SignRow(
 
     @ColumnInfo(name = "путь к фото")
     val photoPath: String
-) {
-    fun toDomain(): SignEntity = SignEntity(
-        id = originalCategoryId.toIntOrNull() ?: originalCategoryId.hashCode(),
-        pddCode = originalCategoryId,
-        title = title,
-        ttsTitle = ttsTitle,
-        description = description,
-        svgPath = photoPath
-    )
-}
+)

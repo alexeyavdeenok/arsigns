@@ -1,7 +1,9 @@
-package com.example.core_data
+package com.example.core_data.repository
 
-import com.example.domain.api.ISignRepository
+import com.example.core_data.mapper.SignMapper.toDomain
+import com.example.core_data.room.SignDao
 import com.example.domain.model.SignEntity
+import com.example.domain.repository.ISignRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
@@ -14,9 +16,6 @@ class SignRepositoryImpl @Inject constructor(
 
     private var _cachedSigns: Map<Int, SignEntity> = emptyMap()
 
-    override val cachedSigns: Map<Int, SignEntity>
-        get() = _cachedSigns
-
     override suspend fun preloadCache() = withContext(Dispatchers.IO) {
         _cachedSigns = signDao.getAll()
             .map { it.toDomain() }
@@ -26,15 +25,4 @@ class SignRepositoryImpl @Inject constructor(
     override suspend fun getSignById(id: Int): SignEntity? = withContext(Dispatchers.IO) {
         signDao.getById(id.toString())?.toDomain() ?: _cachedSigns[id]
     }
-
-    override suspend fun getSignByYoloClassIndex(yoloClassIndex: String): SignEntity? = withContext(Dispatchers.IO) {
-        signDao.getByYoloClassIndex(yoloClassIndex)?.toDomain()
-            ?: _cachedSigns.values.firstOrNull { it.pddCode == yoloClassIndex }
-    }
-
-    override suspend fun getAllSigns(): List<SignEntity> = withContext(Dispatchers.IO) {
-        signDao.getAll().map { it.toDomain() }
-    }
-
-    override fun getCachedSignById(id: Int): SignEntity? = _cachedSigns[id]
 }

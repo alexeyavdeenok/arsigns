@@ -1,7 +1,9 @@
-package com.example.core_data
+package com.example.core_data.di
 
 import android.content.Context
 import androidx.room.Room
+import com.example.core_data.room.SignDao
+import com.example.core_data.room.SignRoomDatabase
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn

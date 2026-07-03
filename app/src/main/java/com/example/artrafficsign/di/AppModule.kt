@@ -1,15 +1,11 @@
 package com.example.artrafficsign.di
 
-import com.example.core_data.DataLayerApiImpl
-import com.example.core_data.DynamicListsManagerImpl
-import com.example.core_data.SettingsRepositoryImpl
-import com.example.core_data.SignRepositoryImpl
-import com.example.domain.api.CvLayerApi
-import com.example.domain.api.DataLayerApi
-import com.example.domain.api.IDynamicListsManager
-import com.example.domain.api.ISettingsRepository
-import com.example.domain.api.ISignRepository
-import com.example.domain.api.VoiceLayerApi
+import com.example.core_data.repository.DynamicListsManagerImpl
+import com.example.core_data.repository.SettingsRepositoryImpl
+import com.example.core_data.repository.SignRepositoryImpl
+import com.example.domain.repository.IDynamicListsManager
+import com.example.domain.repository.ISettingsRepository
+import com.example.domain.repository.ISignRepository
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -33,16 +29,8 @@ abstract class AppModule {
     @Singleton
     abstract fun bindSettingsRepository(impl: SettingsRepositoryImpl): ISettingsRepository
 
-    @Binds
-    @Singleton
-    abstract fun bindDataLayerApi(impl: DataLayerApiImpl): DataLayerApi
-
     companion object {
-        /**
-         * Provides null for CvLayerApi as the module is not yet implemented.
-         * AppViewModel handles this nullable dependency.
-         */
         @Provides
-        fun provideCvLayerApi(): CvLayerApi? = null
+        fun provideCvLayerApi(): com.example.domain.api.CvLayerApi? = null
     }
 }

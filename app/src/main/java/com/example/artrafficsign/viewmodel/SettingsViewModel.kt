@@ -2,11 +2,11 @@ package com.example.artrafficsign.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.domain.api.ISettingsRepository
 import com.example.domain.model.AppSettings
-import com.example.domain.model.YoloModelType
+import com.example.domain.repository.ISettingsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
 
@@ -15,21 +15,21 @@ class SettingsViewModel @Inject constructor(
     private val settingsRepository: ISettingsRepository
 ) : ViewModel() {
 
-    val settings = settingsRepository.settingsFlow.stateIn(
+    val settingsState: StateFlow<AppSettings> = settingsRepository.settingsFlow.stateIn(
         viewModelScope,
         SharingStarted.Eagerly,
         AppSettings()
     )
 
-    suspend fun updateConfidenceThreshold(threshold: Float) {
-        settingsRepository.updateConfidenceThreshold(threshold)
+    fun onConfidenceChanged(value: Float) {
+        settingsRepository.updateConfidenceThreshold(value)
     }
 
-    suspend fun toggleTts(enabled: Boolean) {
+    fun onModelSelected(path: String) {
+        settingsRepository.updateModelPath(path)
+    }
+
+    fun onTtsToggled(enabled: Boolean) {
         settingsRepository.toggleTts(enabled)
-    }
-
-    suspend fun updateSelectedModel(modelType: YoloModelType) {
-        settingsRepository.updateSelectedModel(modelType)
     }
 }

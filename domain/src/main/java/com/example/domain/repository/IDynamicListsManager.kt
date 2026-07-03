@@ -1,4 +1,4 @@
-package com.example.domain.api
+package com.example.domain.repository
 
 import com.example.domain.model.ActiveSign
 import com.example.domain.model.SignEntity
@@ -7,10 +7,7 @@ import kotlinx.coroutines.flow.StateFlow
 interface IDynamicListsManager {
     val activeSigns: StateFlow<List<ActiveSign>>
     val historySigns: StateFlow<List<SignEntity>>
-
-    suspend fun updateActiveSigns(signs: List<ActiveSign>)
-
-    suspend fun recordRecognizedSign(sign: SignEntity)
-
-    fun clear()
+    fun updateActiveSigns(signs: List<ActiveSign>)
+    fun setModelBusy(busy: Boolean)
+    fun isModelBusy(): Boolean
 }

@@ -1,10 +1,10 @@
 package com.example.domain.model
 
 data class ActiveSign(
-    val signId: Int,
-    val confidence: Float,
+    val id: Int,
     val xMin: Float,
     val yMin: Float,
     val xMax: Float,
-    val yMax: Float
+    val yMax: Float,
+    val confidence: Float
 )

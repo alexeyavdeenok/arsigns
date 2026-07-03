@@ -1,7 +1,7 @@
 package com.example.domain.api
+
 import com.example.domain.model.DetectedSign
 import kotlinx.coroutines.flow.StateFlow
-
 
 /**
  * Интерфейс взаимодействия с модулем компьютерного зрения (:feature-cv).

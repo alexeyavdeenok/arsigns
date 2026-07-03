@@ -1,4 +1,4 @@
-package com.example.core_data
+package com.example.core_data.datastore
 
 import android.content.Context
 import androidx.datastore.core.DataStore
