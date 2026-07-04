@@ -9,8 +9,5 @@ import dagger.hilt.components.SingletonComponent
 @InstallIn(SingletonComponent::class)
 abstract class AppModule {
 
-    companion object {
-        @Provides
-        fun provideCvLayerApi(): com.example.domain.api.CvLayerApi? = null
-    }
+
 }

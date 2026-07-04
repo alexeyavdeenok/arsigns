@@ -263,7 +263,7 @@ fun DetectionOverlay(
                 modifier = Modifier
                     .offset(x = left.dp, y = top.dp)
                     .size(width = width.dp, height = height.dp)
-                    .clickable { onSignClick(sign.id) }
+                    .clickable { onSignClick(sign.trackerId) }
             )
         }
     }

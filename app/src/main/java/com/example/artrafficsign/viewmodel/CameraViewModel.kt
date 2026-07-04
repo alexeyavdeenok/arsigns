@@ -36,8 +36,4 @@ class CameraViewModel @Inject constructor(
             }
         }
     }
-    
-    fun updateDetections(signs: List<ActiveSign>) {
-        dynamicListsManager.updateActiveSigns(signs)
-    }
 }

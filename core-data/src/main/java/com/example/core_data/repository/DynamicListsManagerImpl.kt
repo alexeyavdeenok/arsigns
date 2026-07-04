@@ -50,8 +50,7 @@ class DynamicListsManagerImpl @Inject constructor(
         detected.mapNotNull { toActiveSign(it) }
 
     private suspend fun toActiveSign(detected: DetectedSign): ActiveSign? {
-        val catalogId = detected.yoloClassIndex.toIntOrNull() ?: return null
-        val signEntity = signRepository.getSignById(catalogId) ?: return null
+        val signEntity = signRepository.getSignById(detected.classId) ?: return null
 
         return ActiveSign(
             trackerId = detected.id,
@@ -60,7 +59,7 @@ class DynamicListsManagerImpl @Inject constructor(
             xMax = detected.xMax,
             yMax = detected.yMax,
             confidence = detected.confidence,
-            yoloClassIndex = detected.yoloClassIndex,
+            classId = detected.classId,
             sign = signEntity
         )
     }

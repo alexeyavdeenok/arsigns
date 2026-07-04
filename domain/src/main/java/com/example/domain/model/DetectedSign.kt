@@ -7,5 +7,5 @@ data class DetectedSign(
     val yMin: Float,
     val xMax: Float,
     val yMax: Float,
-    val yoloClassIndex: String
+    val classId: Int
 )
