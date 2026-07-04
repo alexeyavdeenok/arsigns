@@ -5,6 +5,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
 import com.example.domain.model.AppSettings
+import com.example.domain.model.YoloModelType
 import com.example.domain.repository.ISettingsRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
@@ -23,14 +24,17 @@ class SettingsRepositoryImpl @Inject constructor(
     private val dataStore = context.dataStore
 
     private val confidenceKey = floatPreferencesKey("confidence_threshold")
-    private val modelPathKey = stringPreferencesKey("active_model_path")
+    private val selectedModelKey = stringPreferencesKey("selected_model")
+    private val legacyModelPathKey = stringPreferencesKey("active_model_path")
     private val ttsKey = booleanPreferencesKey("is_tts_enabled")
 
     override val settingsFlow: Flow<AppSettings> = dataStore.data.map { preferences ->
         AppSettings(
-            confidenceThreshold = preferences[confidenceKey] ?: 0.5f,
-            activeModelPath = preferences[modelPathKey] ?: "yolov8n.tflite",
-            isTtsEnabled = preferences[ttsKey] ?: true
+            yoloConfidenceThreshold = preferences[confidenceKey] ?: 0.5f,
+            selectedModel = YoloModelType.fromStoredValue(
+                preferences[selectedModelKey] ?: preferences[legacyModelPathKey]
+            ),
+            isVoiceAlertsEnabled = preferences[ttsKey] ?: true
         )
     }
 
@@ -40,9 +44,9 @@ class SettingsRepositoryImpl @Inject constructor(
         }
     }
 
-    override fun updateModelPath(path: String) {
+    override fun updateModel(type: YoloModelType) {
         runBlocking {
-            dataStore.edit { it[modelPathKey] = path }
+            dataStore.edit { it[selectedModelKey] = type.name }
         }
     }
 

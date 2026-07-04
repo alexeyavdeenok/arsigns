@@ -3,6 +3,7 @@ package com.example.artrafficsign.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.domain.model.AppSettings
+import com.example.domain.model.YoloModelType
 import com.example.domain.repository.ISettingsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
@@ -25,8 +26,8 @@ class SettingsViewModel @Inject constructor(
         settingsRepository.updateConfidenceThreshold(value)
     }
 
-    fun onModelSelected(path: String) {
-        settingsRepository.updateModelPath(path)
+    fun onModelSelected(type: YoloModelType) {
+        settingsRepository.updateModel(type)
     }
 
     fun onTtsToggled(enabled: Boolean) {

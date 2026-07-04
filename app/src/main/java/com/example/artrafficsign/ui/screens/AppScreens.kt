@@ -49,6 +49,7 @@ import com.example.artrafficsign.viewmodel.SettingsViewModel
 import com.example.domain.model.ActiveSign
 import com.example.domain.model.AppSettings
 import com.example.domain.model.SignEntity
+import com.example.domain.model.YoloModelType
 import kotlinx.coroutines.launch
 
 sealed class AppScreen(val route: String, val label: String, val icon: ImageVector) {
@@ -119,7 +120,7 @@ fun AppNavigation(
                 SettingsScreen(
                     appSettingsState = settings,
                     onToggleVoice = { enabled -> settingsViewModel.onTtsToggled(enabled) },
-                    onSelectModel = { modelPath -> settingsViewModel.onModelSelected(modelPath) },
+                    onSelectModel = { model -> settingsViewModel.onModelSelected(model) },
                     onThresholdChange = { threshold -> settingsViewModel.onConfidenceChanged(threshold) }
                 )
             }
@@ -338,10 +339,12 @@ fun SignDetailScreen(signId: Int?, appViewModel: AppViewModel, onBack: () -> Uni
 fun SettingsScreen(
     appSettingsState: AppSettings,
     onToggleVoice: (Boolean) -> Unit,
-    onSelectModel: (String) -> Unit,
+    onSelectModel: (YoloModelType) -> Unit,
     onThresholdChange: (Float) -> Unit
 ) {
-    var localThreshold by remember { mutableStateOf(appSettingsState.confidenceThreshold) }
+    var localThreshold by remember(appSettingsState.yoloConfidenceThreshold) {
+        mutableStateOf(appSettingsState.yoloConfidenceThreshold)
+    }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Text("Настройки", style = MaterialTheme.typography.headlineSmall)
@@ -351,7 +354,7 @@ fun SettingsScreen(
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 8.dp)) {
             Text("Включить озвучку", modifier = Modifier.weight(1f))
             Switch(
-                checked = appSettingsState.isTtsEnabled,
+                checked = appSettingsState.isVoiceAlertsEnabled,
                 onCheckedChange = { onToggleVoice(it) }
             )
         }
@@ -367,20 +370,19 @@ fun SettingsScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
         Text("Модель YOLO", fontWeight = FontWeight.Bold)
-        val models = listOf("yolov8n.tflite", "yolov8s.tflite")
-        models.forEach { modelPath ->
+        YoloModelType.entries.forEach { model ->
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { onSelectModel(modelPath) }
+                    .clickable { onSelectModel(model) }
                     .padding(vertical = 4.dp)
             ) {
                 RadioButton(
-                    selected = appSettingsState.activeModelPath == modelPath,
-                    onClick = { onSelectModel(modelPath) }
+                    selected = appSettingsState.selectedModel == model,
+                    onClick = { onSelectModel(model) }
                 )
-                Text(modelPath, modifier = Modifier.padding(start = 8.dp))
+                Text(model.uiName, modifier = Modifier.padding(start = 8.dp))
             }
         }
     }

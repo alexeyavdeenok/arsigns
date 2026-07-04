@@ -1,5 +1,8 @@
 package com.example.feature_cv.inference
 
+import com.example.domain.model.YoloModelType
+import com.example.feature_cv.inference.strategies.YoloV8Strategy
+
 /**
  * Фабрика ModelStrategy по выбранной в настройках модели.
  * Единственное место, которое нужно поправить при добавлении новой модели/архитектуры.
@@ -13,8 +16,7 @@ class ModelStrategyFactory /* @Inject constructor() */ {
      * Пока все варианты — YOLOv8 с разным inputSize, поэтому одна реализация на всех.
      * При появлении другой архитектуры — добавить ветку с другим ModelStrategy.
      */
-    fun create(/* type: com.example.domain.model.YoloModelType */): ModelStrategy {
-        // TODO: return YoloV8Strategy(inputSize = ..., fileName = type.fileName)
-        TODO("не реализовано")
+    fun create(type: YoloModelType): ModelStrategy {
+        return YoloV8Strategy(inputSize = type.inputSize, fileName = type.fileName)
     }
 }

@@ -1,7 +1,27 @@
 package com.example.domain.model
 
+enum class YoloModelType(
+    val fileName: String,
+    val uiName: String,
+    val inputSize: Int
+) {
+    YOLO_V8_640("yolov8n.tflite", "YOLOv8 640", 640),
+    YOLO_V8_416("yolov8s.tflite", "YOLOv8 416", 416),
+    YOLO_V8_224("yolov8s.tflite", "YOLOv8 224", 224);
+
+    companion object {
+        fun fromStoredValue(value: String?): YoloModelType {
+            if (value.isNullOrBlank()) return YOLO_V8_640
+
+            return entries.firstOrNull { it.name == value }
+                ?: entries.firstOrNull { it.fileName == value }
+                ?: YOLO_V8_640
+        }
+    }
+}
+
 data class AppSettings(
-    val confidenceThreshold: Float = 0.5f,
-    val activeModelPath: String = "yolov8n.tflite",
-    val isTtsEnabled: Boolean = true
+    val isVoiceAlertsEnabled: Boolean = true,
+    val yoloConfidenceThreshold: Float = 0.5f,
+    val selectedModel: YoloModelType = YoloModelType.YOLO_V8_640
 )
