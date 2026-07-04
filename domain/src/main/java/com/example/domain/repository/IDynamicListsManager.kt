@@ -7,7 +7,5 @@ import kotlinx.coroutines.flow.StateFlow
 interface IDynamicListsManager {
     val activeSigns: StateFlow<List<ActiveSign>>
     val historySigns: StateFlow<List<SignEntity>>
-    fun updateActiveSigns(signs: List<ActiveSign>)
-    fun setModelBusy(busy: Boolean)
-    fun isModelBusy(): Boolean
+    fun clearActiveSigns()
 }
