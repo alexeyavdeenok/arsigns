@@ -72,6 +72,10 @@ class YoloV8Strategy(
      * Конвертация ARGB Bitmap в NCHW float32 ByteBuffer: сначала подряд все значения
      * канала R по всем пикселям, потом все G, потом все B — именно такого порядка
      * (не interleaved RGB) ждёт модель с input_shape=[1,3,H,W].
+     *
+     * Один проход по pixels вместо трёх — R/G/B каждого пикселя достаём сразу и
+     * пишем по трём разным смещениям буфера (абсолютный putFloat(index, value),
+     * без движения курсора), а не гоняем массив заново под каждый канал.
      */
     private fun bitmapToNchwFloatBuffer(bitmap: Bitmap): ByteBuffer {
         val size = bitmap.width * bitmap.height
@@ -80,17 +84,17 @@ class YoloV8Strategy(
         val pixels = IntArray(size)
         bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
 
-        for (channel in 0..2) {
-            for (pixel in pixels) {
-                val value = when (channel) {
-                    0 -> (pixel shr 16) and 0xFF // R
-                    1 -> (pixel shr 8) and 0xFF  // G
-                    else -> pixel and 0xFF        // B
-                }
-                buffer.putFloat(value / 255f)
-            }
+        val rOffsetBytes = 0
+        val gOffsetBytes = 4 * size
+        val bOffsetBytes = 8 * size
+
+        for (i in 0 until size) {
+            val pixel = pixels[i]
+            val byteIndex = i * 4
+            buffer.putFloat(rOffsetBytes + byteIndex, ((pixel shr 16) and 0xFF) / 255f)
+            buffer.putFloat(gOffsetBytes + byteIndex, ((pixel shr 8) and 0xFF) / 255f)
+            buffer.putFloat(bOffsetBytes + byteIndex, (pixel and 0xFF) / 255f)
         }
-        buffer.rewind()
         return buffer
     }
 
