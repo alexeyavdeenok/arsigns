@@ -42,6 +42,7 @@ import coil.compose.AsyncImage
 import coil.decode.SvgDecoder
 import coil.request.ImageRequest
 
+
 sealed class AppScreen(val route: String, val label: String, val icon: ImageVector) {
     object Home : AppScreen("home", "Главная", Icons.Default.Home)
     object History : AppScreen("history", "История", Icons.Default.History)
@@ -130,7 +131,7 @@ fun AppNavigation(
 fun HomeScreen(cameraViewModel: CameraViewModel, onSignSelected: (Int) -> Unit) {
     val uiState by cameraViewModel.uiState.collectAsState()
 
-    DisposableEffect(cameraViewModel) {
+    DisposableEffect(Unit) {
         cameraViewModel.startDetection()
         onDispose { cameraViewModel.stopDetection() }
     }

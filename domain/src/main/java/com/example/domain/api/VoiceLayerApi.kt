@@ -16,11 +16,13 @@ interface VoiceLayerApi {
      */
     fun speak(text: String)
 
+    fun speakPriority(ttsText: String)
+
     /**
      * Немедленно прервать текущую речь.
      * Полезно, если знак уже пропал из виду или ситуация резко изменилась.
      */
-    fun stopSpeaking()
+    fun stop()
 
     /**
      * Освободить ресурсы движка TTS (TextToSpeech) при закрытии приложения.

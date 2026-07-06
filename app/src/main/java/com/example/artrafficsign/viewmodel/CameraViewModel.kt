@@ -3,12 +3,12 @@ package com.example.artrafficsign.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.domain.api.CvLayerApi
+import com.example.domain.api.VoiceLayerApi
 import com.example.domain.model.ActiveSign
 import com.example.domain.model.SignEntity
 import com.example.domain.repository.IDynamicListsManager
 import com.example.domain.repository.ISettingsRepository
 import com.example.domain.repository.ISignRepository
-import com.example.domain.repository.ITtsManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -20,7 +20,7 @@ class CameraViewModel @Inject constructor(
     private val signRepository: ISignRepository,
     private val dynamicListsManager: IDynamicListsManager,
     private val settingsRepository: ISettingsRepository,
-    private val ttsManager: ITtsManager
+    private val voiceLayerApi: VoiceLayerApi
 ) : ViewModel() {
 
     val uiState: StateFlow<List<ActiveSign>> = dynamicListsManager.activeSigns
@@ -36,7 +36,7 @@ class CameraViewModel @Inject constructor(
             settingsRepository.settingsFlow.collect { settings ->
                 isVoiceAlertsEnabled = settings.isVoiceAlertsEnabled
                 if (!settings.isVoiceAlertsEnabled) {
-                    ttsManager.stop()
+                    voiceLayerApi.stop()
                 }
             }
         }
@@ -48,7 +48,7 @@ class CameraViewModel @Inject constructor(
                 val newSign = activeSigns.firstOrNull { it.trackerId !in previousTrackIds }
 
                 if (newSign != null && isVoiceAlertsEnabled) {
-                    ttsManager.speak(newSign.sign.ttsTitle)
+                    voiceLayerApi.speak(newSign.sign.ttsTitle)
                 }
 
                 previousTrackIds = currentTrackIds
@@ -63,6 +63,7 @@ class CameraViewModel @Inject constructor(
     fun stopDetection() {
         cvLayerApi.stopDetection()
         dynamicListsManager.clearActiveSigns()
+        voiceLayerApi.stop()
     }
 
     override fun onCleared() {

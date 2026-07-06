@@ -1,6 +1,6 @@
 package com.example.feature_tts
 
-import com.example.domain.repository.ITtsManager
+import com.example.domain.api.VoiceLayerApi
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -13,5 +13,5 @@ abstract class TtsModule {
 
     @Binds
     @Singleton
-    abstract fun bindTtsManager(impl: TtsManagerImpl): ITtsManager
+    abstract fun bindVoiceLayerApi(impl: TtsManagerImpl): VoiceLayerApi
 }
