@@ -16,6 +16,7 @@ import javax.inject.Singleton
  * Когда реальный CvLayerApiImpl появится в src/main/.../di/CvModule.kt —
  * этот файл (и вся папка src/debug/.../fake) удаляется целиком, см. README.md рядом.
  */
+/**
 @Module
 @InstallIn(SingletonComponent::class)
 object FakeCvModule {
@@ -24,3 +25,4 @@ object FakeCvModule {
     @Singleton
     fun provideCvLayerApi(): CvLayerApi = FakeCvLayerApiImpl()
 }
+*/

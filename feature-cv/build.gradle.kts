@@ -1,10 +1,9 @@
-import com.android.build.api.dsl.AaptOptions
-
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.jetbrains.kotlin.android)
     alias(libs.plugins.google.ksp)
     alias(libs.plugins.hilt.android)
+    alias(libs.plugins.kotlin.compose)
 }
 
 android {
@@ -38,8 +37,8 @@ android {
 
     // КРИТИЧЕСКИ ВАЖНО ДЛЯ TENSORFLOW LITE:
     // Запрещаем сжимать tflite модели при сборке APK, иначе они не считаются из assets
-    aaptOptions {
-        noCompress("tflite")
+    androidResources {
+        noCompress += "tflite"
     }
 }
 
@@ -49,7 +48,16 @@ dependencies {
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
 
-    // Dagger Hilt для DI внутри модуля фичи
+    // ТОЧНО ТАК ЖЕ, КАК В :APP — Используем BOM
+    implementation(platform(libs.androidx.compose.bom))
+
+    // Теперь эти библиотеки берут те же самые версии, что и в главном модуле
+    implementation(libs.androidx.compose.runtime)
+    implementation(libs.androidx.compose.ui)
+    implementation(libs.androidx.compose.foundation) // Теперь он разрешится правильно!
+    implementation(libs.androidx.compose.material3)
+
+    // Dagger Hilt
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
 
@@ -59,7 +67,7 @@ dependencies {
     implementation(libs.camera.lifecycle)
     implementation(libs.camera.view)
 
-    // TensorFlow Lite (Запуск нейросети ONNX/TFLite локально)
+    // TensorFlow Lite
     implementation(libs.tf.lite)
     implementation(libs.tf.lite.support)
     implementation(libs.tf.lite.gpu)

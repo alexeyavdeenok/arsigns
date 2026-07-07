@@ -2,6 +2,7 @@ package com.example.feature_cv.inference
 
 import com.example.domain.model.YoloModelType
 import com.example.feature_cv.inference.strategies.YoloV8Strategy
+import javax.inject.Inject
 
 /**
  * Фабрика ModelStrategy по выбранной в настройках модели.
@@ -9,7 +10,7 @@ import com.example.feature_cv.inference.strategies.YoloV8Strategy
  *
  * @see com.example.domain.model.YoloModelType enum с вариантами из настроек
  */
-class ModelStrategyFactory /* @Inject constructor() */ {
+class ModelStrategyFactory @Inject constructor()  {
 
     /**
      * @return готовую стратегию под конкретный YoloModelType.

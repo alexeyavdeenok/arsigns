@@ -1,27 +1,50 @@
 package com.example.feature_cv.di
 
-/**
- * Именованные диспетчеры/executor'ы, чтобы явно разделять потоки:
- * - InferenceDispatcher: единственный поток для Interpreter.run() (не потокобезопасен)
- * - CameraDispatcher: поток для ImageAnalysis.Analyzer (не главный поток)
- *
- * Явное разделение — чтобы случайно не дёрнуть interpreter параллельно из двух мест.
- */
-// @Module
-// @InstallIn(SingletonComponent::class)
-// object DispatcherModule {
-//
-//     TODO: @InferenceDispatcher — quality: один поток (Dispatchers.Default.limitedParallelism(1)
-//           или отдельный single-thread Executor)
-//     @Provides
-//     @InferenceDispatcher
-//     fun provideInferenceDispatcher(): CoroutineDispatcher { TODO() }
-//
-//     TODO: @CameraDispatcher — Executor для ImageAnalysis.setAnalyzer
-//     @Provides
-//     @CameraDispatcher
-//     fun provideCameraExecutor(): Executor { TODO() }
-// }
+import dagger.Module
+import dagger.Provides
+import dagger.hilt.InstallIn
+import dagger.hilt.components.SingletonComponent
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.asCoroutineDispatcher
+import java.util.concurrent.Executor
+import java.util.concurrent.Executors
+import javax.inject.Qualifier
+import javax.inject.Singleton
 
-// TODO: @Qualifier annotation class InferenceDispatcher
-// TODO: @Qualifier annotation class CameraDispatcher
+/**
+ * Единственный поток под все вызовы Interpreter (load/run/close) — Interpreter не
+ * потокобезопасен, все обращения к нему обязаны идти строго последовательно с
+ * одного и того же потока (см. обсуждение потокобезопасности TFLite Interpreter).
+ */
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class InferenceDispatcher
+
+/** Поток для ImageAnalysis.Analyzer (CameraX) — не главный поток, отдельный от инференса. */
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class CameraDispatcher
+
+@Module
+@InstallIn(SingletonComponent::class)
+object DispatcherModule {
+
+    @Provides
+    @Singleton
+    @InferenceDispatcher
+    fun provideInferenceDispatcher(): CoroutineDispatcher =
+    // Именно ОДИН поток (не пул) — гарантия, что load()/run()/close() физически
+    // не могут пересечься по времени, даже если их инициировали из разных мест
+        // (CameraX callback и Flow-подписка на смену модели в ModelManager).
+        Executors.newSingleThreadExecutor { runnable ->
+            Thread(runnable, "InferenceThread")
+        }.asCoroutineDispatcher()
+
+    @Provides
+    @Singleton
+    @CameraDispatcher
+    fun provideCameraExecutor(): Executor =
+        Executors.newSingleThreadExecutor { runnable ->
+            Thread(runnable, "CameraAnalysisThread")
+        }
+}

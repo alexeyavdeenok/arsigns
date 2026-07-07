@@ -1,5 +1,9 @@
 package com.example.artrafficsign.ui.screens
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -26,6 +30,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -38,6 +43,7 @@ import com.example.domain.model.ActiveSign
 import com.example.domain.model.AppSettings
 import com.example.domain.model.SignEntity
 import com.example.domain.model.YoloModelType
+import com.example.feature_cv.camera.CameraPreview
 import coil.compose.AsyncImage
 import coil.decode.SvgDecoder
 import coil.request.ImageRequest
@@ -65,7 +71,7 @@ fun AppNavigation(
         bottomBar = {
             val navBackStackEntry by navController.currentBackStackEntryAsState()
             val currentRoute = navBackStackEntry?.destination?.route
-            
+
             if (currentRoute in items.map { it.route }) {
                 NavigationBar {
                     items.forEach { screen ->
@@ -130,23 +136,55 @@ fun AppNavigation(
 @Composable
 fun HomeScreen(cameraViewModel: CameraViewModel, onSignSelected: (Int) -> Unit) {
     val uiState by cameraViewModel.uiState.collectAsState()
+    val context = LocalContext.current
 
-    DisposableEffect(Unit) {
-        cameraViewModel.startDetection()
+    var hasCameraPermission by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+        )
+    }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted -> hasCameraPermission = granted }
+
+    LaunchedEffect(Unit) {
+        if (!hasCameraPermission) {
+            permissionLauncher.launch(Manifest.permission.CAMERA)
+        }
+    }
+
+    // startDetection()/stopDetection() имеет смысл вызывать, только когда камера реально
+    // доступна — иначе CvLayerApi.startDetection() дёрнет CameraController на камеру,
+    // на которую ещё нет разрешения. Ключ hasCameraPermission — эффект пересоздастся
+    // и вызовет startDetection() автоматически в момент, когда пользователь даст доступ.
+    DisposableEffect(hasCameraPermission) {
+        if (hasCameraPermission) {
+            cameraViewModel.startDetection()
+        }
         onDispose { cameraViewModel.stopDetection() }
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black)
-    ) {
-        DetectionOverlay(
-            activeSigns = uiState,
-            onSignClick = { signId ->
-                onSignSelected(signId)
+    Box(modifier = Modifier.fillMaxSize()) {
+        if (hasCameraPermission) {
+            CameraPreview(modifier = Modifier.fillMaxSize())
+
+            DetectionOverlay(
+                activeSigns = uiState,
+                onSignClick = { signId ->
+                    onSignSelected(signId)
+                }
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("Нужен доступ к камере, чтобы распознавать знаки", color = Color.White)
             }
-        )
+        }
     }
 }
 
@@ -195,7 +233,7 @@ fun HistoryScreen(cameraViewModel: CameraViewModel, onSignSelected: (Int) -> Uni
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Text("История распознавания", style = MaterialTheme.typography.headlineSmall)
         Spacer(modifier = Modifier.height(16.dp))
-        
+
         if (historyState.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text("История пока пуста", style = MaterialTheme.typography.bodyLarge)

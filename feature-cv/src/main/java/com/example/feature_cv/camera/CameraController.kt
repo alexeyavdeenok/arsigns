@@ -1,64 +1,105 @@
 package com.example.feature_cv.camera
 
+import android.content.Context
+import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.Preview
+import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.LifecycleOwner
+import dagger.hilt.android.qualifiers.ApplicationContext
+import java.util.concurrent.Executor
+import javax.inject.Inject
+import javax.inject.Singleton
+
 /**
  * Единственная точка биндинга камеры к жизненному циклу.
  *
  * ВАЖНО: CameraX требует, чтобы Preview и ImageAnalysis биндились ОДНИМ вызовом
- * bindToLifecycle(...). Повторный вызов bindToLifecycle отвязывает предыдущие use-case'ы.
- * Поэтому CameraController — единственный владелец камеры в модуле,
- * а CameraPreview (UI) и FrameAnalyzer (CV) получают доступ только через него.
+ * bindToLifecycle(...). Повторный вызов bindToLifecycle отвязывает предыдущие use-case'ы —
+ * поэтому CameraController единственный, кто вообще вызывает bindToLifecycle в модуле.
  *
- * Жизненный цикл:
- * - bind() вызывается один раз, когда экран с камерой становится видимым
- * - attachSurface() дёргается из Composable каждый раз, когда PreviewView готов
- * - startAnalysis()/stopAnalysis() управляют ТОЛЬКО ImageAnalysis, не трогая Preview
- *
- * @see CameraPreview публичный Composable, дёргающий attachSurface()
- * @see FrameAnalyzer анализатор, который сюда прицепляется через startAnalysis()
+ * ProcessCameraProvider.getInstance() асинхронный (ListenableFuture) — attachSurface()/
+ * startAnalysis() могут быть вызваны ДО того, как провайдер готов (например Composable
+ * успел скомпоноваться раньше, чем прогрузился future). Поэтому оба хранят "отложенное"
+ * состояние и применяются повторно сразу после готовности провайдера.
  */
-class CameraController /* @Inject constructor(
+@Singleton
+class CameraController @Inject constructor(
     @ApplicationContext private val context: Context
-) */ {
+) {
 
-    // TODO: ProcessCameraProvider — получить через ProcessCameraProvider.getInstance(context)
-    // TODO: Preview use case (CameraX)
-    // TODO: ImageAnalysis use case, backpressure = STRATEGY_KEEP_ONLY_LATEST
+    private var cameraProvider: ProcessCameraProvider? = null
+    private var preview: Preview? = null
+    private var imageAnalysis: ImageAnalysis? = null
+
+    private var pendingSurfaceProvider: Preview.SurfaceProvider? = null
+    private var pendingAnalyzer: Pair<ImageAnalysis.Analyzer, Executor>? = null
 
     /**
      * Биндит Preview + ImageAnalysis к переданному LifecycleOwner.
-     * Вызывается один раз при инициализации экрана с камерой.
+     * Идемпотентен: повторный вызов с тем же lifecycleOwner ничего не ломает благодаря
+     * cameraProvider.unbindAll() перед повторным bindToLifecycle.
      */
-    fun bind(/* lifecycleOwner: LifecycleOwner */) {
-        // TODO: cameraProvider.bindToLifecycle(lifecycleOwner, cameraSelector, preview, imageAnalysis)
+    fun bind(lifecycleOwner: LifecycleOwner) {
+        val future = ProcessCameraProvider.getInstance(context)
+        future.addListener({
+            val provider = future.get()
+
+            val newPreview = Preview.Builder().build()
+            val newImageAnalysis = ImageAnalysis.Builder()
+                // Пока анализ занят текущим кадром — новые кадры не копятся в очереди,
+                // остаётся только самый свежий. Это и есть "пропуск кадров, пока YOLO занята".
+                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
+                .build()
+
+            provider.unbindAll()
+            provider.bindToLifecycle(
+                lifecycleOwner,
+                CameraSelector.DEFAULT_BACK_CAMERA,
+                newPreview,
+                newImageAnalysis
+            )
+
+            cameraProvider = provider
+            preview = newPreview
+            imageAnalysis = newImageAnalysis
+
+            // Применяем то, что могло прийти раньше, чем провайдер стал готов
+            pendingSurfaceProvider?.let { newPreview.setSurfaceProvider(it) }
+            pendingAnalyzer?.let { (analyzer, executor) -> newImageAnalysis.setAnalyzer(executor, analyzer) }
+        }, ContextCompat.getMainExecutor(context))
     }
 
     /**
      * Подключает SurfaceProvider от PreviewView к текущему Preview use-case.
-     * Можно вызывать многократно (например при пересоздании Composable) без повторного bind().
+     * Можно вызывать многократно без повторного bind().
      */
-    fun attachSurface(/* surfaceProvider: Preview.SurfaceProvider */) {
-        // TODO: preview.setSurfaceProvider(surfaceProvider)
+    fun attachSurface(surfaceProvider: Preview.SurfaceProvider) {
+        pendingSurfaceProvider = surfaceProvider
+        preview?.setSurfaceProvider(surfaceProvider)
     }
 
-    /**
-     * Включить анализ кадров (подключить analyzer к ImageAnalysis).
-     * Preview продолжает работать независимо.
-     */
-    fun startAnalysis(/* analyzer: ImageAnalysis.Analyzer, executor: Executor */) {
-        // TODO: imageAnalysis.setAnalyzer(executor, analyzer)
+    /** Включить анализ кадров. Preview продолжает работать независимо. */
+    fun startAnalysis(analyzer: ImageAnalysis.Analyzer, executor: Executor) {
+        pendingAnalyzer = analyzer to executor
+        imageAnalysis?.setAnalyzer(executor, analyzer)
     }
 
-    /**
-     * Выключить анализ кадров. НЕ трогает bindToLifecycle и Preview.
-     */
+    /** Выключить анализ кадров. НЕ трогает bindToLifecycle и Preview. */
     fun stopAnalysis() {
-        // TODO: imageAnalysis.clearAnalyzer()
+        pendingAnalyzer = null
+        imageAnalysis?.clearAnalyzer()
     }
 
-    /**
-     * Полностью отвязать камеру (например при уничтожении экрана).
-     */
+    /** Полностью отвязать камеру (например при уничтожении экрана). */
     fun unbind() {
-        // TODO: cameraProvider.unbindAll()
+        cameraProvider?.unbindAll()
+        cameraProvider = null
+        preview = null
+        imageAnalysis = null
+        pendingSurfaceProvider = null
+        pendingAnalyzer = null
     }
 }
