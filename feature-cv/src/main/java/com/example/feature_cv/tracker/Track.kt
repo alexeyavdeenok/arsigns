@@ -11,5 +11,8 @@ data class Track(
     val id: Int,
     var lastDetection: RawDetection,
     /** Сколько кадров подряд трек может прожить без совпадения, прежде чем удалится */
-    var livesLeft: Int
+    var livesLeft: Int,
+    /** Скорость смещения центра рамки за один шаг обновления трекера (нормализованные координаты) */
+    var velocityX: Float = 0f,
+    var velocityY: Float = 0f
 )
