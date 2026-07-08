@@ -5,12 +5,16 @@ import androidx.lifecycle.viewModelScope
 import com.example.domain.api.CvLayerApi
 import com.example.domain.api.VoiceLayerApi
 import com.example.domain.model.ActiveSign
+import com.example.domain.model.FrameSize
 import com.example.domain.model.SignEntity
 import com.example.domain.repository.IDynamicListsManager
 import com.example.domain.repository.ISettingsRepository
 import com.example.domain.repository.ISignRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -23,8 +27,25 @@ class CameraViewModel @Inject constructor(
     private val voiceLayerApi: VoiceLayerApi
 ) : ViewModel() {
 
-    val uiState: StateFlow<List<ActiveSign>> = dynamicListsManager.activeSigns
+    /**
+     * Пользовательский порог уверенности применяется ЗДЕСЬ, а не в :feature-cv —
+     * это UX-настройка отображения, должна применяться мгновенно при движении слайдера,
+     * без повторного инференса. :feature-cv/трекер видят ВСЕ детекции выше базового
+     * "пола" (см. BASE_CONFIDENCE_FLOOR в CvLayerApiImpl) независимо от этого порога —
+     * иначе TTL трекера ломался бы при каждом движении слайдера пользователем.
+     */
+    val uiState: StateFlow<List<ActiveSign>> = combine(
+        dynamicListsManager.activeSigns,
+        settingsRepository.settingsFlow
+    ) { activeSigns, settings ->
+        activeSigns.filter { it.confidence >= settings.yoloConfidenceThreshold }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     val historyState: StateFlow<List<SignEntity>> = dynamicListsManager.historySigns
+
+    /** Размер кадра — нужен :app, чтобы корректно пересчитать нормализованные координаты рамок на экран. */
+    val frameSize: StateFlow<FrameSize?> = cvLayerApi.frameSize
+
     private var isVoiceAlertsEnabled: Boolean = true
 
     init {

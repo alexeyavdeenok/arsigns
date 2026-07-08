@@ -2,6 +2,7 @@ package com.example.feature_cv
 
 import com.example.domain.api.CvLayerApi
 import com.example.domain.model.DetectedSign
+import com.example.domain.model.FrameSize
 import com.example.domain.repository.ISettingsRepository
 import com.example.feature_cv.camera.CameraController
 import com.example.feature_cv.camera.FrameAnalyzer
@@ -20,10 +21,6 @@ import java.util.concurrent.Executor
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * Точка склейки всего модуля. Единственная реализация domain.api.CvLayerApi.
- * :app работает только с этим контрактом, ничего не зная про CameraX/TFLite внутри.
- */
 @Singleton
 class CvLayerApiImpl @Inject constructor(
     private val cameraController: CameraController,
@@ -38,24 +35,20 @@ class CvLayerApiImpl @Inject constructor(
     private val _liveDetectedSigns = MutableStateFlow<List<DetectedSign>>(emptyList())
     override val liveDetectedSigns: StateFlow<List<DetectedSign>> = _liveDetectedSigns.asStateFlow()
 
-    /**
-     * Собственный долгоживущий scope на InferenceDispatcher — сюда же ModelManager
-     * подписывает смену модели. Раз это тот же диспетчер, на котором FrameAnalyzer
-     * блокируется на время run() (см. FrameAnalyzer), хот-свап модели физически не
-     * может пересечься по времени с обработкой кадра — оба ждут своей очереди на
-     * одном и том же потоке.
-     */
+    private val _frameSize = MutableStateFlow<FrameSize?>(null)
+    override val frameSize: StateFlow<FrameSize?> = _frameSize.asStateFlow()
+
     private val engineScope = CoroutineScope(SupervisorJob() + inferenceDispatcher)
 
     private val frameAnalyzer = FrameAnalyzer(
         inferenceEngine = inferenceEngine,
         tracker = tracker,
         inferenceDispatcher = inferenceDispatcher,
-        // Базовый "пол" уверенности — отсекает явный шум ещё до трекера.
-        // НЕ пользовательский порог (yoloConfidenceThreshold) — тот применяется
-        // в :app при отрисовке, а не здесь (см. обсуждение архитектуры фильтрации).
         confidenceThresholdProvider = { BASE_CONFIDENCE_FLOOR },
-        onResult = { signs -> _liveDetectedSigns.value = signs }
+        onResult = { signs, frameWidth, frameHeight ->
+            _liveDetectedSigns.value = signs
+            _frameSize.value = FrameSize(frameWidth, frameHeight)
+        }
     )
 
     init {

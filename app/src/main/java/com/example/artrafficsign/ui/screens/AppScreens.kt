@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -41,6 +42,7 @@ import com.example.artrafficsign.viewmodel.CameraViewModel
 import com.example.artrafficsign.viewmodel.SettingsViewModel
 import com.example.domain.model.ActiveSign
 import com.example.domain.model.AppSettings
+import com.example.domain.model.FrameSize
 import com.example.domain.model.SignEntity
 import com.example.domain.model.YoloModelType
 import com.example.feature_cv.camera.CameraPreview
@@ -136,6 +138,7 @@ fun AppNavigation(
 @Composable
 fun HomeScreen(cameraViewModel: CameraViewModel, onSignSelected: (Int) -> Unit) {
     val uiState by cameraViewModel.uiState.collectAsState()
+    val frameSize by cameraViewModel.frameSize.collectAsState()
     val context = LocalContext.current
 
     var hasCameraPermission by remember {
@@ -154,10 +157,6 @@ fun HomeScreen(cameraViewModel: CameraViewModel, onSignSelected: (Int) -> Unit) 
         }
     }
 
-    // startDetection()/stopDetection() имеет смысл вызывать, только когда камера реально
-    // доступна — иначе CvLayerApi.startDetection() дёрнет CameraController на камеру,
-    // на которую ещё нет разрешения. Ключ hasCameraPermission — эффект пересоздастся
-    // и вызовет startDetection() автоматически в момент, когда пользователь даст доступ.
     DisposableEffect(hasCameraPermission) {
         if (hasCameraPermission) {
             cameraViewModel.startDetection()
@@ -171,6 +170,7 @@ fun HomeScreen(cameraViewModel: CameraViewModel, onSignSelected: (Int) -> Unit) 
 
             DetectionOverlay(
                 activeSigns = uiState,
+                frameSize = frameSize,
                 onSignClick = { signId ->
                     onSignSelected(signId)
                 }
@@ -191,35 +191,54 @@ fun HomeScreen(cameraViewModel: CameraViewModel, onSignSelected: (Int) -> Unit) 
 @Composable
 fun DetectionOverlay(
     activeSigns: List<ActiveSign>,
+    frameSize: FrameSize?,
     onSignClick: (Int) -> Unit
 ) {
+    if (frameSize == null || frameSize.width == 0 || frameSize.height == 0) return
+
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val screenWidthPx = constraints.maxWidth.toFloat()
+        val screenHeightPx = constraints.maxHeight.toFloat()
+
+        // Повторяем математику PreviewView.ScaleType.FILL_CENTER (кроп с сохранением
+        // пропорций, без искажения) — иначе рамки не совпадут с реальным видео, если
+        // aspect ratio кадра с камеры не совпадает с aspect ratio экрана.
+        val scale = maxOf(
+            screenWidthPx / frameSize.width,
+            screenHeightPx / frameSize.height
+        )
+        val displayedFrameWidth = frameSize.width * scale
+        val displayedFrameHeight = frameSize.height * scale
+        val offsetX = (displayedFrameWidth - screenWidthPx) / 2f
+        val offsetY = (displayedFrameHeight - screenHeightPx) / 2f
+
+        fun mapToScreen(sign: ActiveSign): Pair<Offset, Size> {
+            val left = sign.xMin * frameSize.width * scale - offsetX
+            val top = sign.yMin * frameSize.height * scale - offsetY
+            val width = (sign.xMax - sign.xMin) * frameSize.width * scale
+            val height = (sign.yMax - sign.yMin) * frameSize.height * scale
+            return Offset(left, top) to Size(width, height)
+        }
+
         Canvas(modifier = Modifier.fillMaxSize()) {
             activeSigns.forEach { sign ->
-                val left = sign.xMin * size.width
-                val top = sign.yMin * size.height
-                val width = (sign.xMax - sign.xMin) * size.width
-                val height = (sign.yMax - sign.yMin) * size.height
-
+                val (offset, size) = mapToScreen(sign)
                 drawRect(
                     color = Color.Green,
-                    topLeft = Offset(left, top),
-                    size = Size(width, height),
+                    topLeft = offset,
+                    size = size,
                     style = Stroke(width = 3.dp.toPx())
                 )
             }
         }
 
+        val density = LocalDensity.current
         activeSigns.forEach { sign ->
-            val left = sign.xMin * maxWidth.value
-            val top = sign.yMin * maxHeight.value
-            val width = (sign.xMax - sign.xMin) * maxWidth.value
-            val height = (sign.yMax - sign.yMin) * maxHeight.value
-
+            val (offset, size) = mapToScreen(sign)
             Box(
                 modifier = Modifier
-                    .offset(x = left.dp, y = top.dp)
-                    .size(width = width.dp, height = height.dp)
+                    .offset(x = with(density) { offset.x.toDp() }, y = with(density) { offset.y.toDp() })
+                    .size(width = with(density) { size.width.toDp() }, height = with(density) { size.height.toDp() })
                     .clickable { onSignClick(sign.sign.id) }
             )
         }

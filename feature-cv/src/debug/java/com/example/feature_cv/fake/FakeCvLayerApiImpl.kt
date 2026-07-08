@@ -26,6 +26,8 @@ import kotlin.random.Random
  * (например через отдельный debug-вариант CvModule) — :app и весь код выше по потоку
  * (DynamicListsManagerImpl и т.д.) не заметят разницы, т.к. работают только с контрактом.
  */
+
+/**
 class FakeCvLayerApiImpl(
     private val maxConcurrentSigns: Int = 4,
     private val tickIntervalMs: Long = 33L, // ~30 FPS
@@ -147,3 +149,4 @@ class FakeCvLayerApiImpl(
         var yMax: Float = yMin + height
     }
 }
+*/

@@ -1,3 +1,4 @@
+/**
 package com.example.feature_cv.fake.di
 
 import com.example.domain.api.CvLayerApi
@@ -7,7 +8,7 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
-
+*/
 /**
  * Живёт ТОЛЬКО в src/debug — в release-сборку этот файл физически не попадает.
  * Единственная задача: подставить FakeCvLayerApiImpl в граф Hilt как реализацию CvLayerApi,

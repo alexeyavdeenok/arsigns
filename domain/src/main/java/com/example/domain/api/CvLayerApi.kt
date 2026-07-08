@@ -1,28 +1,29 @@
 package com.example.domain.api
 
 import com.example.domain.model.DetectedSign
+import com.example.domain.model.FrameSize
 import kotlinx.coroutines.flow.StateFlow
 
 /**
  * Интерфейс взаимодействия с модулем компьютерного зрения (:feature-cv).
- * Этот «трафарет» слушает основной модуль (:app), чтобы рисовать рамки на экране.
  */
 interface CvLayerApi {
 
     /**
      * Поток «живых» распознанных знаков в реальном времени.
-     * Твоя YOLO + трекер непрерывно (30 FPS) обновляют этот список,
-     * а :app модуль подписывается на него и рисует Bounding Box'ы поверх камеры.
+     * Координаты нормализованы [0,1] относительно frameSize (см. ниже) — НЕ относительно
+     * экрана и не относительно входа модели. :app обязан пересчитать их через frameSize,
+     * а не умножать напрямую на размер Canvas/экрана — иначе рамки исказятся при
+     * несовпадении aspect ratio кадра и экрана (см. обсуждение растянутых рамок).
      */
     val liveDetectedSigns: StateFlow<List<DetectedSign>>
 
     /**
-     * Включить обработку кадров с камеры (запуск YOLO)
+     * Размер кадра (после поворота в правильную ориентацию), к которому относятся
+     * нормализованные координаты в liveDetectedSigns. Null, пока не обработан ни один кадр.
      */
-    fun startDetection()
+    val frameSize: StateFlow<FrameSize?>
 
-    /**
-     * Поставить детекцию на паузу (например, когда свернули приложение или открыли меню)
-     */
+    fun startDetection()
     fun stopDetection()
 }
