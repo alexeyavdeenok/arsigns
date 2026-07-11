@@ -7,7 +7,11 @@ enum class YoloModelType(
 ) {
     YOLO_V8_640("yolov8n_640.tflite", "YOLOv8 640", 640),
     YOLO_V8_416("yolov8n_416.tflite", "YOLOv8 416", 416),
-    YOLO_V8_224("yolov8n_224.tflite", "YOLOv8 224", 224);
+    YOLO_V8_224("yolov8n_224.tflite", "YOLOv8 224", 224),
+
+    YOLO26_640("yolo26n_640.tflite", "YOLO26 640", 640),
+    YOLO26_416("yolo26n_416.tflite", "YOLO26 416", 416),
+    YOLO26_224("yolo26n_224.tflite", "YOLO26 224", 224);
 
 
     companion object {

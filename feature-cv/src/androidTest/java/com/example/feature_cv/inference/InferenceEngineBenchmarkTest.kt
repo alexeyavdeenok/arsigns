@@ -5,6 +5,7 @@ import android.graphics.BitmapFactory
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.example.feature_cv.inference.delegate.DelegateProvider
+import com.example.feature_cv.inference.strategies.YoloV26Strategy
 import com.example.feature_cv.inference.strategies.YoloV8Strategy
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -77,7 +78,7 @@ class InferenceEngineBenchmarkTest {
         println("=== КОНЕЦ СЕРИИ БЕНЧМАРКОВ ===\n")
     }
 
-    private fun runBenchmarkForStrategy(strategy: YoloV8Strategy) {
+    private fun runBenchmarkForStrategy(strategy: ModelStrategy) {
         // Прогрев — первые вызовы обычно медленнее (JIT/делегат "прогревается")
         repeat(N_WARMUP) { engine.run(testBitmap, CONFIDENCE_THRESHOLD) }
 
@@ -117,5 +118,24 @@ class InferenceEngineBenchmarkTest {
             val detections = engine.run(testBitmap, CONFIDENCE_THRESHOLD)
             detections.forEach { d -> assertTrue(d.xMin < d.xMax && d.yMin < d.yMax) }
         }
+    }
+    @Test
+    fun measureAverageInferenceTimeYolo26() {
+        // Список конфигураций YOLO26 для последовательного тестирования производительности
+        val modelsToBenchmark = listOf(
+            YoloV26Strategy(inputSize = 640, fileName = "yolo26n_640.tflite"),
+            YoloV26Strategy(inputSize = 416, fileName = "yolo26n_416.tflite"),
+            YoloV26Strategy(inputSize = 224, fileName = "yolo26n_224.tflite")
+        )
+
+        println("\n=== НАЧАЛО СЕРИИ БЕНЧМАРКОВ: YOLO26 ===")
+
+        for (strategy in modelsToBenchmark) {
+            // Переключаем движок на нужную модель перед прогревом и замером
+            engine.load(strategy)
+            runBenchmarkForStrategy(strategy)
+        }
+
+        println("=== КОНЕЦ СЕРИИ БЕНЧМАРКОВ: YOLO26 ===\n")
     }
 }
