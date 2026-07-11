@@ -10,30 +10,35 @@ import com.example.feature_cv.inference.model.PreprocessResult
 import com.example.feature_cv.inference.model.RawDetection
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
 /**
- * Реализация ModelStrategy под YOLO26, экспортированную в TFLite через LiteRT
- * (litert_torch) напрямую из PyTorch.
+ * Реализация ModelStrategy под YOLO26, экспортированную в TFLite с end2end=False
+ * (one-to-many head — традиционный YOLO-выход с внешним NMS).
  *
- * Проверенная конвенция (см. Python-диагностику перед переносом в Kotlin):
- * - Layout входа: NCHW [1, 3, inputSize, inputSize] — совпадает с YOLOv8,
- *   preprocess() ниже — копия соответствующего метода YoloV8Strategy
- *   (сознательно не вынесено в общий helper — см. пояснение в чате).
- * - Выход: [1, 300, 6] — на каждую из 300 строк [x1, y1, x2, y2, confidence, classId].
- *   Модель one-to-one head — end-to-end, NMS-free: раздельный NMS по классам
- *   (как в YoloV8Strategy) здесь НЕ нужен, дубликаты уже отфильтрованы моделью.
- * - !!! ПРОВЕРЬ НА СВОЁМ ЭКСПОРТЕ !!!: координаты x1..y2 могут быть либо
- *   нормализованы в [0,1] относительно inputSize, либо уже в пикселях inputSize.
- *   Ниже — автоопределение по максимальному значению координаты (тот же приём,
- *   что в Python-скрипте). Если на твоём экспорте всегда один и тот же вариант —
- *   надёжнее убрать автоопределение и зашить константой, см. TODO ниже.
+ * ПРОВЕРЕНО на Python-диагностике перед переносом сюда (см. обсуждение в чате,
+ * реальные min/max сырых значений на всех трёх разрешениях 640/416/224):
+ * - Layout входа: NCHW [1, 3, inputSize, inputSize] — как у YoloV8Strategy.
+ * - Выход: [1, 4 + numClasses, numAnchors] (numClasses=155 подтверждено:
+ *   channels=159 в логах диагностики).
+ * - Box-координаты (cx, cy, w, h) НОРМАЛИЗОВАНЫ в [0,1] относительно inputSize
+ *   (диагностика показала box min/max ~0.002/1.000 на всех разрешениях) —
+ *   это отличается от YoloV8Strategy, где координаты уже в пикселях inputSize.
+ *   Поэтому здесь ОБЯЗАТЕЛЬНО домножаем на inputSize перед letterbox-пересчётом.
+ * - Class-score УЖЕ являются вероятностями в [0,1] (диагностика: min/max
+ *   0.000/~0.8 на всех разрешениях) — дополнительный sigmoid НЕ нужен,
+ *   в отличие от некоторых экспортов, где каналы score — сырые логиты.
+ * - NMS обязателен и раздельный по классам (как в YoloV8Strategy) — иначе
+ *   соседние знаки разных типов на одном столбе гасят друг друга.
  */
 class YoloV26Strategy(
     override val inputSize: Int,
     override val fileName: String,
-    private val letterboxColor: Int = (0xFF shl 24) or (114 shl 16) or (114 shl 8) or 114
+    private val numClasses: Int = 155,
+    private val letterboxColor: Int = (0xFF shl 24) or (114 shl 16) or (114 shl 8) or 114,
+    private val iouThreshold: Float = 0.45f
 ) : ModelStrategy {
 
     override fun preprocess(bitmap: Bitmap): PreprocessResult {
@@ -90,48 +95,113 @@ class YoloV26Strategy(
         transform: LetterboxTransform,
         confidenceThreshold: Float
     ): List<RawDetection> {
-        // rawOutput: [300][6] -> x1, y1, x2, y2, confidence, classId
-        val result = ArrayList<RawDetection>()
+        val numAnchors = rawOutput[0].size
 
-        for (row in rawOutput) {
-            val confidence = row[4]
-            if (confidence < confidenceThreshold) continue // "пустые" слоты из 300 отсекаются здесь
+        // Тот же приём, что в YoloV8Strategy: идём по classIdx во внешнем цикле,
+        // чтобы внутренний цикл читал один и тот же FloatArray последовательно
+        // (rawOutput — это 159 отдельных FloatArray-объектов в куче, не единый блок памяти).
+        val maxScore = FloatArray(numAnchors)
+        val maxClassId = IntArray(numAnchors) { -1 }
 
-            var x1 = row[0]
-            var y1 = row[1]
-            var x2 = row[2]
-            var y2 = row[3]
-            val classId = row[5].toInt()
-
-            // TODO: если знаешь точно, нормализован выход или нет — замени эту проверку
-            // на константу (isNormalizedOutput = true/false) вместо автоопределения.
-            val looksNormalized = x2 <= 1.5f && y2 <= 1.5f
-            if (looksNormalized) {
-                x1 *= inputSize; y1 *= inputSize
-                x2 *= inputSize; y2 *= inputSize
+        for (classIdx in 0 until numClasses) {
+            val channelRow = rawOutput[4 + classIdx]
+            for (anchor in 0 until numAnchors) {
+                val score = channelRow[anchor]
+                if (score > maxScore[anchor]) {
+                    maxScore[anchor] = score
+                    maxClassId[anchor] = classIdx
+                }
             }
-
-            val origX1 = ((x1 - transform.padX) / transform.scale)
-                .coerceIn(0f, transform.origWidth.toFloat())
-            val origY1 = ((y1 - transform.padY) / transform.scale)
-                .coerceIn(0f, transform.origHeight.toFloat())
-            val origX2 = ((x2 - transform.padX) / transform.scale)
-                .coerceIn(0f, transform.origWidth.toFloat())
-            val origY2 = ((y2 - transform.padY) / transform.scale)
-                .coerceIn(0f, transform.origHeight.toFloat())
-
-            if (origX2 <= origX1 || origY2 <= origY1) continue
-
-            result += RawDetection(
-                classId = classId,
-                confidence = confidence,
-                xMin = origX1 / transform.origWidth,
-                yMin = origY1 / transform.origHeight,
-                xMax = origX2 / transform.origWidth,
-                yMax = origY2 / transform.origHeight
-            )
         }
 
+        val candidates = ArrayList<Candidate>()
+
+        for (anchor in 0 until numAnchors) {
+            val score = maxScore[anchor]
+            if (score <= confidenceThreshold) continue
+
+            // Box-координаты нормализованы в [0,1] относительно inputSize —
+            // домножаем на inputSize, ПОДТВЕРЖДЕНО диагностикой (см. docstring класса).
+            val cx = rawOutput[0][anchor] * inputSize
+            val cy = rawOutput[1][anchor] * inputSize
+            val w = rawOutput[2][anchor] * inputSize
+            val h = rawOutput[3][anchor] * inputSize
+
+            // Снимаем letterbox-паддинг и масштаб — возвращаемся в пиксели исходного кадра
+            val x1 = ((cx - w / 2f - transform.padX) / transform.scale)
+                .coerceIn(0f, transform.origWidth.toFloat())
+            val y1 = ((cy - h / 2f - transform.padY) / transform.scale)
+                .coerceIn(0f, transform.origHeight.toFloat())
+            val x2 = ((cx + w / 2f - transform.padX) / transform.scale)
+                .coerceIn(0f, transform.origWidth.toFloat())
+            val y2 = ((cy + h / 2f - transform.padY) / transform.scale)
+                .coerceIn(0f, transform.origHeight.toFloat())
+
+            if (x2 <= x1 || y2 <= y1) continue // вырожденная рамка — пропускаем
+
+            candidates += Candidate(classId = maxClassId[anchor], confidence = score, x1 = x1, y1 = y1, x2 = x2, y2 = y2)
+        }
+
+        val kept = nmsPerClass(candidates, iouThreshold)
+
+        return kept.map { c ->
+            RawDetection(
+                classId = c.classId,
+                confidence = c.confidence,
+                xMin = c.x1 / transform.origWidth,
+                yMin = c.y1 / transform.origHeight,
+                xMax = c.x2 / transform.origWidth,
+                yMax = c.y2 / transform.origHeight
+            )
+        }
+    }
+
+    /**
+     * Жадный NMS, раздельный по classId — знаки разных типов друг друга не гасят,
+     * даже если их рамки сильно перекрываются.
+     */
+    private fun nmsPerClass(candidates: List<Candidate>, iouThreshold: Float): List<Candidate> {
+        val result = ArrayList<Candidate>()
+
+        for (classId in candidates.map { it.classId }.distinct()) {
+            val sameClass = candidates.filter { it.classId == classId }.sortedByDescending { it.confidence }
+            val suppressed = BooleanArray(sameClass.size)
+
+            for (i in sameClass.indices) {
+                if (suppressed[i]) continue
+                result += sameClass[i]
+
+                for (j in (i + 1) until sameClass.size) {
+                    if (suppressed[j]) continue
+                    if (calculateIou(sameClass[i], sameClass[j]) > iouThreshold) {
+                        suppressed[j] = true
+                    }
+                }
+            }
+        }
         return result
     }
+
+    private fun calculateIou(a: Candidate, b: Candidate): Float {
+        val interX1 = max(a.x1, b.x1)
+        val interY1 = max(a.y1, b.y1)
+        val interX2 = min(a.x2, b.x2)
+        val interY2 = min(a.y2, b.y2)
+
+        val interArea = max(0f, interX2 - interX1) * max(0f, interY2 - interY1)
+        val areaA = (a.x2 - a.x1) * (a.y2 - a.y1)
+        val areaB = (b.x2 - b.x1) * (b.y2 - b.y1)
+        val unionArea = areaA + areaB - interArea
+
+        return if (unionArea <= 0f) 0f else interArea / unionArea
+    }
+
+    private data class Candidate(
+        val classId: Int,
+        val confidence: Float,
+        val x1: Float,
+        val y1: Float,
+        val x2: Float,
+        val y2: Float
+    )
 }
