@@ -32,6 +32,12 @@ import kotlin.math.roundToInt
  *   в отличие от некоторых экспортов, где каналы score — сырые логиты.
  * - NMS обязателен и раздельный по классам (как в YoloV8Strategy) — иначе
  *   соседние знаки разных типов на одном столбе гасят друг друга.
+ *
+ * Основная стоимость постпроцессинга — не NMS (кандидатов после порога confidence
+ * обычно единицы-десятки), а argmax-проход по [numClasses][numAnchors]
+ * (155 x 8400 ~ 1.3 млн сравнений на кадр для 640x640). Это ожидаемая и намеренная
+ * цена: тот же паттерн (внешний цикл по classIdx, а не по anchor) используется
+ * и в YoloV8Strategy ради cache-locality — см. комментарий там.
  */
 class YoloV26Strategy(
     override val inputSize: Int,
@@ -118,7 +124,7 @@ class YoloV26Strategy(
 
         for (anchor in 0 until numAnchors) {
             val score = maxScore[anchor]
-            if (score <= confidenceThreshold) continue
+            if (score < confidenceThreshold) continue
 
             // Box-координаты нормализованы в [0,1] относительно inputSize —
             // домножаем на inputSize, ПОДТВЕРЖДЕНО диагностикой (см. docstring класса).
@@ -159,12 +165,16 @@ class YoloV26Strategy(
     /**
      * Жадный NMS, раздельный по classId — знаки разных типов друг друга не гасят,
      * даже если их рамки сильно перекрываются.
+     *
+     * groupBy вместо map+distinct+filter: один проход по candidates вместо
+     * (кол-во уникальных классов + 1) проходов — при небольшом числе кандидатов
+     * разница в микросекундах, но лишней работы делать незачем.
      */
     private fun nmsPerClass(candidates: List<Candidate>, iouThreshold: Float): List<Candidate> {
         val result = ArrayList<Candidate>()
 
-        for (classId in candidates.map { it.classId }.distinct()) {
-            val sameClass = candidates.filter { it.classId == classId }.sortedByDescending { it.confidence }
+        for ((_, group) in candidates.groupBy { it.classId }) {
+            val sameClass = group.sortedByDescending { it.confidence }
             val suppressed = BooleanArray(sameClass.size)
 
             for (i in sameClass.indices) {
