@@ -26,7 +26,7 @@ import kotlin.math.min
  */
 class KalmanSignTracker(
     private val iouThreshold: Float = 0.35f,
-    private val maxLives: Int = 5,
+    private val maxLives: Int = 4,
     private val processNoisePosition: Float = 1e-4f,
     private val processNoiseVelocity: Float = 1e-4f,
     private val measurementNoise: Float = 0.01f

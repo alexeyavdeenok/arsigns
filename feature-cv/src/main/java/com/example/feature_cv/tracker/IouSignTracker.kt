@@ -28,9 +28,9 @@ import kotlin.math.min
  */
 class IouSignTracker(
     private val iouThreshold: Float = 0.35f,
-    private val maxLives: Int = 5,
+    private val maxLives: Int = 4,
     /** 0 = полностью игнорировать новое измерение скорости, 1 = не сглаживать вообще */
-    private val velocitySmoothing: Float = 0.5f
+    private val velocitySmoothing: Float = 0.6f
 ) : SignTracker {
 
     private val activeTracks = mutableListOf<Track>()
